@@ -25,6 +25,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   jq \
   nano \
   vim \
+  curl \
+  xvfb \
+  libgl1-mesa-dri \
+  libgl1-mesa-glx \
+  libvulkan1 \
+  mesa-vulkan-drivers \
+  libxkbcommon-dev \
+  libxkbcommon-x11-0 \
+  libxcb-xkb-dev \
+  libfontconfig1-dev \
+  libfreetype6-dev \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Ensure default node user has access to /usr/local/share
@@ -53,6 +64,14 @@ RUN ARCH=$(dpkg --print-architecture) && \
   wget "https://github.com/dandavison/delta/releases/download/${GIT_DELTA_VERSION}/git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
   sudo dpkg -i "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
   rm "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb"
+
+# Install Rust (system-wide via rustup for the node user)
+USER node
+ENV CARGO_HOME=/home/node/.cargo
+ENV RUSTUP_HOME=/home/node/.rustup
+ENV PATH=$PATH:/home/node/.cargo/bin
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+USER root
 
 # Set up non-root user
 USER node
