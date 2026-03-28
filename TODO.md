@@ -4,7 +4,7 @@
 
 ## Open
 
-- [ ] Scaffold Cargo project with iced dependency
+- [x] Scaffold Cargo project with iced dependency
 - [ ] Implement flat Model struct and Message enum
 - [ ] Render task buttons grid
 - [ ] Start timer on task button click, switch task auto-stops current
