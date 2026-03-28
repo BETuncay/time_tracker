@@ -10,7 +10,7 @@
 - [x] Start timer on task button click, switch task auto-stops current
 - [x] Tick subscription — update elapsed time display
 - [x] Stop timer and persist entry to SQLite
-- [ ] Entry log panel — list today's entries with task, description, start, end, duration
+- [x] Entry log panel — list today's entries with task, description, start, end, duration
 - [ ] Manual entry form — add a past time block
 - [ ] Edit entry — modify description or times inline
 - [ ] Task management — add, rename, remove task buttons

@@ -9,6 +9,16 @@ pub fn format_duration(secs: i64) -> String {
     format!("{:02}:{:02}:{:02}", h, m, s)
 }
 
+/// Format a unix timestamp as local time "HH:MM".
+pub fn format_time(ts: i64) -> String {
+    use chrono::{Local, TimeZone};
+    Local
+        .timestamp_opt(ts, 0)
+        .single()
+        .map(|dt| dt.format("%H:%M").to_string())
+        .unwrap_or_else(|| "--:--".to_string())
+}
+
 /// Format a duration in seconds as "HHh MMm".
 pub fn format_hm(secs: i64) -> String {
     let secs = secs.max(0) as u64;
@@ -79,6 +89,12 @@ mod tests {
     #[test]
     fn format_hm_basic() {
         assert_eq!(format_hm(3661), "01h 01m");
+    }
+
+    #[test]
+    fn format_time_invalid_returns_placeholder() {
+        // i64::MIN is not a valid timestamp; should return the fallback
+        assert_eq!(format_time(i64::MIN), "--:--");
     }
 
     #[test]

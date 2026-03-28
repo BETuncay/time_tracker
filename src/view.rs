@@ -1,6 +1,6 @@
 use iced::widget::{button, column, container, row, text};
 use iced::{Element, Length};
-use crate::model::{format_duration, format_hm, Model, ViewState};
+use crate::model::{format_duration, format_hm, format_time, Model, ViewState};
 use crate::update::Message;
 
 impl Model {
@@ -66,19 +66,37 @@ impl Model {
         // Entry log
         let log: Element<'_, Message> = {
             let mut items: Vec<Element<'_, Message>> = vec![
-                text("Today's entries").size(16).into(),
+                // Header row
+                row![
+                    text("Task").width(Length::FillPortion(3)),
+                    text("Description").width(Length::FillPortion(4)),
+                    text("Start").width(Length::FillPortion(2)),
+                    text("End").width(Length::FillPortion(2)),
+                    text("Dur").width(Length::FillPortion(2)),
+                    text("").width(32),
+                ]
+                .spacing(8)
+                .into(),
             ];
             if self.entries.is_empty() {
                 items.push(text("No entries yet.").size(14).into());
             } else {
                 for entry in &self.entries {
+                    let end_str = entry
+                        .ended_at
+                        .map(format_time)
+                        .unwrap_or_else(|| "—".to_string());
                     items.push(
                         row![
-                            text(entry.task.as_str()).width(Length::Fill),
-                            text(format_hm(entry.duration_secs())),
+                            text(entry.task.as_str()).width(Length::FillPortion(3)),
+                            text(entry.description.as_str()).width(Length::FillPortion(4)),
+                            text(format_time(entry.started_at)).width(Length::FillPortion(2)),
+                            text(end_str).width(Length::FillPortion(2)),
+                            text(format_hm(entry.duration_secs())).width(Length::FillPortion(2)),
                             button("X")
                                 .on_press(Message::DeleteEntry(entry.id))
-                                .style(button::danger),
+                                .style(button::danger)
+                                .width(32),
                         ]
                         .spacing(8)
                         .into(),
