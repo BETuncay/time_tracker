@@ -1,10 +1,10 @@
 use iced::widget::{button, column, container, row, text};
 use iced::{Element, Length};
-use crate::model::{Model, ViewState};
+use crate::model::{format_duration, format_hm, Model, ViewState};
 use crate::update::Message;
 
 impl Model {
-    pub fn view(&self) -> Element<Message> {
+    pub fn view(&self) -> Element<'_, Message> {
         match &self.view_state {
             ViewState::Main => self.view_main(),
             ViewState::ManualEntry => text("Manual Entry — TODO").into(),
@@ -14,16 +14,13 @@ impl Model {
         }
     }
 
-    fn view_main(&self) -> Element<Message> {
+    fn view_main(&self) -> Element<'_, Message> {
         // Active timer status
-        let status: Element<Message> = if let Some(timer) = &self.active {
-            let elapsed = timer.elapsed_start.elapsed().as_secs();
-            let h = elapsed / 3600;
-            let m = (elapsed % 3600) / 60;
-            let s = elapsed % 60;
+        let status: Element<'_, Message> = if let Some(timer) = &self.active {
+            let elapsed = timer.elapsed_start.elapsed().as_secs() as i64;
             column![
                 text(format!("Running: {}", timer.task)).size(18),
-                text(format!("{:02}:{:02}:{:02}", h, m, s)).size(32),
+                text(format_duration(elapsed)).size(32),
                 button("Stop").on_press(Message::StopCurrent),
             ]
             .spacing(8)
@@ -33,11 +30,11 @@ impl Model {
         };
 
         // Task buttons grid — two per row
-        let task_buttons: Element<Message> = {
-            let mut rows: Vec<Element<Message>> = Vec::new();
+        let task_buttons: Element<'_, Message> = {
+            let mut rows: Vec<Element<'_, Message>> = Vec::new();
             let mut chunks = self.tasks.chunks(2);
             while let Some(chunk) = chunks.next() {
-                let mut r: Vec<Element<Message>> = chunk
+                let mut r: Vec<Element<'_, Message>> = chunk
                     .iter()
                     .map(|t| {
                         button(text(t.as_str()))
@@ -56,18 +53,15 @@ impl Model {
         };
 
         // Entry log
-        let log: Element<Message> = {
-            let mut items: Vec<Element<Message>> = vec![
+        let log: Element<'_, Message> = {
+            let mut items: Vec<Element<'_, Message>> = vec![
                 text("Today's entries").size(16).into(),
             ];
             for entry in &self.entries {
-                let dur = entry.ended_at.map(|e| e - entry.started_at).unwrap_or(0);
-                let h = dur / 3600;
-                let m = (dur % 3600) / 60;
                 items.push(
                     row![
                         text(entry.task.as_str()).width(Length::Fill),
-                        text(format!("{:02}h {:02}m", h, m)),
+                        text(format_hm(entry.duration_secs())),
                         button("X").on_press(Message::DeleteEntry(entry.id)),
                     ]
                     .spacing(8)

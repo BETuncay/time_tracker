@@ -1,5 +1,22 @@
 use std::time::Instant;
 
+/// Format a duration in seconds as "HH:MM:SS".
+pub fn format_duration(secs: i64) -> String {
+    let secs = secs.max(0) as u64;
+    let h = secs / 3600;
+    let m = (secs % 3600) / 60;
+    let s = secs % 60;
+    format!("{:02}:{:02}:{:02}", h, m, s)
+}
+
+/// Format a duration in seconds as "HHh MMm".
+pub fn format_hm(secs: i64) -> String {
+    let secs = secs.max(0) as u64;
+    let h = secs / 3600;
+    let m = (secs % 3600) / 60;
+    format!("{:02}h {:02}m", h, m)
+}
+
 #[derive(Debug, Clone)]
 pub struct Entry {
     pub id: i64,
@@ -31,4 +48,60 @@ pub struct Model {
     pub active: Option<ActiveTimer>,
     pub entries: Vec<Entry>,
     pub view_state: ViewState,
+}
+
+impl Entry {
+    /// Duration in seconds, or 0 if the entry has no end time.
+    pub fn duration_secs(&self) -> i64 {
+        self.ended_at.map(|e| e - self.started_at).unwrap_or(0).max(0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn format_duration_zero() {
+        assert_eq!(format_duration(0), "00:00:00");
+    }
+
+    #[test]
+    fn format_duration_one_hour() {
+        assert_eq!(format_duration(3661), "01:01:01");
+    }
+
+    #[test]
+    fn format_duration_negative_clamps_to_zero() {
+        assert_eq!(format_duration(-5), "00:00:00");
+    }
+
+    #[test]
+    fn format_hm_basic() {
+        assert_eq!(format_hm(3661), "01h 01m");
+    }
+
+    #[test]
+    fn entry_duration_secs_closed() {
+        let e = Entry {
+            id: 1,
+            task: "Dev".into(),
+            description: "".into(),
+            started_at: 1000,
+            ended_at: Some(4600),
+        };
+        assert_eq!(e.duration_secs(), 3600);
+    }
+
+    #[test]
+    fn entry_duration_secs_open() {
+        let e = Entry {
+            id: 2,
+            task: "Dev".into(),
+            description: "".into(),
+            started_at: 1000,
+            ended_at: None,
+        };
+        assert_eq!(e.duration_secs(), 0);
+    }
 }

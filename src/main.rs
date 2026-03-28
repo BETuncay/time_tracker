@@ -3,7 +3,7 @@ mod model;
 mod update;
 mod view;
 
-use iced::{application, Settings, Theme};
+use iced::{application, Theme};
 use model::Model;
 
 pub fn main() -> iced::Result {
