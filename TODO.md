@@ -6,7 +6,7 @@
 
 - [x] Scaffold Cargo project with iced dependency
 - [x] Implement flat Model struct and Message enum
-- [ ] Render task buttons grid
+- [x] Render task buttons grid
 - [ ] Start timer on task button click, switch task auto-stops current
 - [ ] Tick subscription — update elapsed time display
 - [ ] Stop timer and persist entry to SQLite
