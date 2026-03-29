@@ -1,6 +1,6 @@
-use iced::widget::{button, column, container, row, text, text_input, horizontal_space};
+use iced::widget::{button, column, container, row, text, text_input, horizontal_space, Rule};
 use iced::{Element, Length};
-use crate::model::{format_duration, format_hm, format_time, Model, ViewState};
+use crate::model::{compute_report_totals, format_duration, format_hm, format_time, Model, ViewState};
 use crate::update::Message;
 
 impl Model {
@@ -10,7 +10,7 @@ impl Model {
             ViewState::ManualEntry => self.view_manual_entry(),
             ViewState::EditEntry(_) => self.view_edit_entry(),
             ViewState::TaskManagement => self.view_task_management(),
-            ViewState::Report => text("Report — TODO").into(),
+            ViewState::Report => self.view_report(),
         }
     }
 
@@ -115,6 +115,9 @@ impl Model {
                 .on_press(Message::ShowView(ViewState::ManualEntry))
                 .style(button::secondary),
             horizontal_space(),
+            button("Report")
+                .on_press(Message::ShowView(ViewState::Report))
+                .style(button::secondary),
             button("Manage Tasks")
                 .on_press(Message::ShowView(ViewState::TaskManagement))
                 .style(button::secondary),
@@ -353,5 +356,67 @@ impl Model {
             column(items).spacing(10).padding(16),
         )
         .into()
+    }
+
+    fn view_report(&self) -> Element<'_, Message> {
+        // Today midnight UTC timestamp (consistent with load_today)
+        let today_start = {
+            use chrono::{Utc, TimeZone, Datelike};
+            let now = Utc::now();
+            Utc.with_ymd_and_hms(now.year(), now.month(), now.day(), 0, 0, 0)
+                .unwrap()
+                .timestamp()
+        };
+
+        let totals = compute_report_totals(&self.report_entries, today_start);
+
+        let mut items: Vec<Element<'_, Message>> = vec![
+            text("Report").size(20).into(),
+            row![
+                text("Task").width(Length::FillPortion(4)),
+                text("Today").width(Length::FillPortion(2)),
+                text("This Week").width(Length::FillPortion(2)),
+            ]
+            .spacing(8)
+            .into(),
+            Rule::horizontal(1).into(),
+        ];
+
+        if totals.is_empty() {
+            items.push(text("No entries this week.").size(14).into());
+        } else {
+            let today_total: i64 = totals.iter().map(|(_, td, _)| td).sum();
+            let week_total: i64 = totals.iter().map(|(_, _, wk)| wk).sum();
+            for (task, today_secs, week_secs) in totals {
+                items.push(
+                    row![
+                        text(task).width(Length::FillPortion(4)),
+                        text(format_hm(today_secs)).width(Length::FillPortion(2)),
+                        text(format_hm(week_secs)).width(Length::FillPortion(2)),
+                    ]
+                    .spacing(8)
+                    .into(),
+                );
+            }
+            items.push(Rule::horizontal(1).into());
+            items.push(
+                row![
+                    text("Total").width(Length::FillPortion(4)),
+                    text(format_hm(today_total)).width(Length::FillPortion(2)),
+                    text(format_hm(week_total)).width(Length::FillPortion(2)),
+                ]
+                .spacing(8)
+                .into(),
+            );
+        }
+
+        items.push(
+            button("Back")
+                .on_press(Message::ShowView(ViewState::Main))
+                .style(button::secondary)
+                .into(),
+        );
+
+        container(column(items).spacing(10).padding(16)).into()
     }
 }

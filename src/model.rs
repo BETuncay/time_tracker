@@ -64,11 +64,33 @@ pub fn parse_hhmm_today(s: &str) -> Option<i64> {
         .map(|dt| dt.timestamp())
 }
 
+/// Returns `(task, today_secs, week_secs)` sorted by task name.
+/// `today_start` is the unix timestamp of local midnight today.
+pub fn compute_report_totals(entries: &[Entry], today_start: i64) -> Vec<(String, i64, i64)> {
+    use std::collections::HashMap;
+    let mut totals: HashMap<String, (i64, i64)> = HashMap::new();
+    for entry in entries {
+        let dur = entry.duration_secs();
+        let bucket = totals.entry(entry.task.clone()).or_insert((0, 0));
+        bucket.1 += dur;
+        if entry.started_at >= today_start {
+            bucket.0 += dur;
+        }
+    }
+    let mut result: Vec<(String, i64, i64)> = totals
+        .into_iter()
+        .map(|(task, (today, week))| (task, today, week))
+        .collect();
+    result.sort_by(|a, b| a.0.cmp(&b.0));
+    result
+}
+
 #[derive(Debug, Clone)]
 pub struct Model {
     pub tasks: Vec<String>,
     pub active: Option<ActiveTimer>,
     pub entries: Vec<Entry>,
+    pub report_entries: Vec<Entry>,
     pub view_state: ViewState,
     // manual entry form state
     pub form_task: String,
@@ -157,6 +179,42 @@ mod tests {
             ended_at: None,
         };
         assert_eq!(e.duration_secs(), 0);
+    }
+
+    #[test]
+    fn compute_report_totals_basic() {
+        let entries = vec![
+            Entry { id: 1, task: "Dev".into(), description: "".into(), started_at: 1000, ended_at: Some(4600) }, // 3600s
+            Entry { id: 2, task: "Dev".into(), description: "".into(), started_at: 5000, ended_at: Some(6800) }, // 1800s
+            Entry { id: 3, task: "Meetings".into(), description: "".into(), started_at: 500, ended_at: Some(2300) }, // 1800s
+        ];
+        // today_start = 900: entries 1 and 2 are today, entry 3 is earlier this week
+        let totals = compute_report_totals(&entries, 900);
+        assert_eq!(totals.len(), 2);
+        // sorted: Dev, Meetings
+        let dev = totals.iter().find(|(t, _, _)| t == "Dev").unwrap();
+        assert_eq!(dev.1, 5400); // today: 3600+1800
+        assert_eq!(dev.2, 5400); // week: same
+        let meetings = totals.iter().find(|(t, _, _)| t == "Meetings").unwrap();
+        assert_eq!(meetings.1, 0);    // not today
+        assert_eq!(meetings.2, 1800); // week
+    }
+
+    #[test]
+    fn compute_report_totals_empty() {
+        let totals = compute_report_totals(&[], 0);
+        assert!(totals.is_empty());
+    }
+
+    #[test]
+    fn compute_report_totals_sorted_by_name() {
+        let entries = vec![
+            Entry { id: 1, task: "Zzz".into(), description: "".into(), started_at: 100, ended_at: Some(200) },
+            Entry { id: 2, task: "Aaa".into(), description: "".into(), started_at: 100, ended_at: Some(200) },
+        ];
+        let totals = compute_report_totals(&entries, 0);
+        assert_eq!(totals[0].0, "Aaa");
+        assert_eq!(totals[1].0, "Zzz");
     }
 
     // Task management invariants

@@ -58,6 +58,31 @@ pub fn delete_task(conn: &Connection, name: &str) -> Result<()> {
     Ok(())
 }
 
+pub fn load_week(conn: &Connection) -> Result<Vec<Entry>> {
+    use chrono::{Utc, TimeZone, Datelike};
+    let now = Utc::now();
+    let days_since_monday = now.weekday().num_days_from_monday() as i64;
+    let monday = now.date_naive() - chrono::Duration::days(days_since_monday);
+    let week_start = Utc
+        .with_ymd_and_hms(monday.year(), monday.month(), monday.day(), 0, 0, 0)
+        .unwrap()
+        .timestamp();
+
+    let mut stmt = conn.prepare(
+        "SELECT id, task, description, started_at, ended_at FROM entries WHERE started_at >= ? ORDER BY started_at",
+    )?;
+    let rows = stmt.query_map(params![week_start], |row| {
+        Ok(Entry {
+            id: row.get(0)?,
+            task: row.get(1)?,
+            description: row.get(2)?,
+            started_at: row.get(3)?,
+            ended_at: row.get(4)?,
+        })
+    })?;
+    rows.collect()
+}
+
 pub fn load_today(conn: &Connection) -> Result<Vec<Entry>> {
     // midnight unix timestamp for today (UTC)
     let today_start = {

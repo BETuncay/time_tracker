@@ -14,7 +14,7 @@
 - [x] Manual entry form — add a past time block
 - [x] Edit entry — modify description or times inline
 - [x] Task management — add, rename, remove task buttons
-- [ ] Basic reporting — daily and weekly totals per task
+- [x] Basic reporting — daily and weekly totals per task
 
 ## Done
 

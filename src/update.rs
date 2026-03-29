@@ -43,6 +43,7 @@ impl Model {
             tasks,
             active: None,
             entries,
+            report_entries: Vec::new(),
             view_state: ViewState::Main,
             form_task,
             form_desc: String::new(),
@@ -114,6 +115,10 @@ impl Model {
                             self.form_end = entry.ended_at.map(format_time).unwrap_or_default();
                             self.form_error = None;
                         }
+                    }
+                    ViewState::Report => {
+                        let conn = db::open().expect("db open");
+                        self.report_entries = db::load_week(&conn).unwrap_or_default();
                     }
                     _ => {}
                 }
