@@ -1,5 +1,5 @@
 use iced::Task;
-use crate::model::{ActiveTimer, Model, ViewState};
+use crate::model::{ActiveTimer, Model, ViewState, parse_hhmm_today};
 use crate::db;
 use std::time::Instant;
 
@@ -9,14 +9,14 @@ pub enum Message {
     StopCurrent,
     Tick(Instant),
     EditDescription(i64, String),
-    AddManualEntry {
-        task: String,
-        description: String,
-        start: i64,
-        end: i64,
-    },
     DeleteEntry(i64),
     ShowView(ViewState),
+    // manual entry form
+    ManualFormTask(String),
+    ManualFormDesc(String),
+    ManualFormStart(String),
+    ManualFormEnd(String),
+    SubmitManualEntry,
 }
 
 impl Model {
@@ -29,11 +29,17 @@ impl Model {
             "Admin".to_string(),
         ];
         let entries = db::load_today(&conn).unwrap_or_default();
+        let form_task = tasks.first().cloned().unwrap_or_default();
         let model = Self {
             tasks,
             active: None,
             entries,
             view_state: ViewState::Main,
+            form_task,
+            form_desc: String::new(),
+            form_start: String::new(),
+            form_end: String::new(),
+            form_error: None,
         };
         (model, Task::none())
     }
@@ -70,20 +76,6 @@ impl Model {
                 Task::none()
             }
 
-            Message::AddManualEntry { task, description, start, end } => {
-                let conn = db::open().expect("db open");
-                if let Ok(id) = db::insert_entry(&conn, &task, &description, start, Some(end)) {
-                    self.entries.push(crate::model::Entry {
-                        id,
-                        task,
-                        description,
-                        started_at: start,
-                        ended_at: Some(end),
-                    });
-                }
-                Task::none()
-            }
-
             Message::DeleteEntry(id) => {
                 let conn = db::open().expect("db open");
                 let _ = db::delete_entry(&conn, id);
@@ -92,7 +84,46 @@ impl Model {
             }
 
             Message::ShowView(state) => {
+                if matches!(state, ViewState::ManualEntry) {
+                    // Reset form when opening
+                    self.form_task = self.tasks.first().cloned().unwrap_or_default();
+                    self.form_desc = String::new();
+                    self.form_start = String::new();
+                    self.form_end = String::new();
+                    self.form_error = None;
+                }
                 self.view_state = state;
+                Task::none()
+            }
+
+            Message::ManualFormTask(t) => { self.form_task = t; Task::none() }
+            Message::ManualFormDesc(d) => { self.form_desc = d; Task::none() }
+            Message::ManualFormStart(s) => { self.form_start = s; Task::none() }
+            Message::ManualFormEnd(e) => { self.form_end = e; Task::none() }
+
+            Message::SubmitManualEntry => {
+                let start = parse_hhmm_today(&self.form_start);
+                let end = parse_hhmm_today(&self.form_end);
+                match (start, end) {
+                    (Some(s), Some(e)) if e > s => {
+                        let conn = db::open().expect("db open");
+                        if let Ok(id) = db::insert_entry(&conn, &self.form_task, &self.form_desc, s, Some(e)) {
+                            self.entries.push(crate::model::Entry {
+                                id,
+                                task: self.form_task.clone(),
+                                description: self.form_desc.clone(),
+                                started_at: s,
+                                ended_at: Some(e),
+                            });
+                            self.entries.sort_by_key(|e| e.started_at);
+                        }
+                        self.view_state = ViewState::Main;
+                        self.form_error = None;
+                    }
+                    (None, _) => self.form_error = Some("Invalid start time (use HH:MM)".into()),
+                    (_, None) => self.form_error = Some("Invalid end time (use HH:MM)".into()),
+                    _ => self.form_error = Some("End time must be after start time".into()),
+                }
                 Task::none()
             }
         }

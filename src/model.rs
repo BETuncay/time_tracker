@@ -52,12 +52,30 @@ pub enum ViewState {
     Report,
 }
 
+/// Parse a "HH:MM" string against today's local date, returning a UTC unix timestamp.
+/// Returns None if the string is not a valid time.
+pub fn parse_hhmm_today(s: &str) -> Option<i64> {
+    use chrono::{Local, NaiveTime, TimeZone};
+    let t = NaiveTime::parse_from_str(s.trim(), "%H:%M").ok()?;
+    let today = Local::now().date_naive();
+    Local
+        .from_local_datetime(&today.and_time(t))
+        .single()
+        .map(|dt| dt.timestamp())
+}
+
 #[derive(Debug, Clone)]
 pub struct Model {
     pub tasks: Vec<String>,
     pub active: Option<ActiveTimer>,
     pub entries: Vec<Entry>,
     pub view_state: ViewState,
+    // manual entry form state
+    pub form_task: String,
+    pub form_desc: String,
+    pub form_start: String,
+    pub form_end: String,
+    pub form_error: Option<String>,
 }
 
 impl Entry {
@@ -107,6 +125,21 @@ mod tests {
             ended_at: Some(4600),
         };
         assert_eq!(e.duration_secs(), 3600);
+    }
+
+    #[test]
+    fn parse_hhmm_today_valid() {
+        assert!(parse_hhmm_today("09:30").is_some());
+        assert!(parse_hhmm_today("00:00").is_some());
+        assert!(parse_hhmm_today("23:59").is_some());
+    }
+
+    #[test]
+    fn parse_hhmm_today_invalid() {
+        assert!(parse_hhmm_today("").is_none());
+        assert!(parse_hhmm_today("25:00").is_none());
+        assert!(parse_hhmm_today("abc").is_none());
+        assert!(parse_hhmm_today("9:300").is_none());
     }
 
     #[test]

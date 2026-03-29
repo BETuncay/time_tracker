@@ -1,4 +1,4 @@
-use iced::widget::{button, column, container, row, text};
+use iced::widget::{button, column, container, row, text, text_input};
 use iced::{Element, Length};
 use crate::model::{format_duration, format_hm, format_time, Model, ViewState};
 use crate::update::Message;
@@ -7,7 +7,7 @@ impl Model {
     pub fn view(&self) -> Element<'_, Message> {
         match &self.view_state {
             ViewState::Main => self.view_main(),
-            ViewState::ManualEntry => text("Manual Entry — TODO").into(),
+            ViewState::ManualEntry => self.view_manual_entry(),
             ViewState::EditEntry(_) => text("Edit Entry — TODO").into(),
             ViewState::TaskManagement => text("Task Management — TODO").into(),
             ViewState::Report => text("Report — TODO").into(),
@@ -106,11 +106,92 @@ impl Model {
             column(items).spacing(4).into()
         };
 
+        let add_btn = button("+ Add Entry")
+            .on_press(Message::ShowView(ViewState::ManualEntry))
+            .style(button::secondary);
+
         container(
-            column![status, task_buttons, log]
+            column![status, task_buttons, log, add_btn]
                 .spacing(24)
                 .padding(16),
         )
         .into()
+    }
+
+    fn view_manual_entry(&self) -> Element<'_, Message> {
+        // Task picker — buttons, one per task, active task highlighted
+        let task_picker: Element<'_, Message> = {
+            let mut rows: Vec<Element<'_, Message>> = Vec::new();
+            for chunk in self.tasks.chunks(2) {
+                let r: Vec<Element<'_, Message>> = chunk
+                    .iter()
+                    .map(|t| {
+                        let is_selected = t == &self.form_task;
+                        let btn = button(
+                            container(text(t.as_str()))
+                                .width(Length::Fill)
+                                .center_x(Length::Fill),
+                        )
+                        .on_press(Message::ManualFormTask(t.clone()))
+                        .width(Length::Fill)
+                        .padding([8, 12]);
+                        if is_selected {
+                            btn.style(button::success).into()
+                        } else {
+                            btn.style(button::secondary).into()
+                        }
+                    })
+                    .collect();
+                rows.push(row(r).spacing(8).into());
+            }
+            column(rows).spacing(8).into()
+        };
+
+        let error_row: Element<'_, Message> = if let Some(err) = &self.form_error {
+            text(err.as_str()).size(13).color([0.9, 0.3, 0.3]).into()
+        } else {
+            text("").size(13).into()
+        };
+
+        let form = column![
+            text("New Entry").size(20),
+            text("Task").size(13),
+            task_picker,
+            text("Description").size(13),
+            text_input("Optional description", &self.form_desc)
+                .on_input(Message::ManualFormDesc)
+                .padding([8, 10]),
+            row![
+                column![
+                    text("Start (HH:MM)").size(13),
+                    text_input("e.g. 09:00", &self.form_start)
+                        .on_input(Message::ManualFormStart)
+                        .padding([8, 10]),
+                ]
+                .spacing(4)
+                .width(Length::Fill),
+                column![
+                    text("End (HH:MM)").size(13),
+                    text_input("e.g. 10:30", &self.form_end)
+                        .on_input(Message::ManualFormEnd)
+                        .padding([8, 10]),
+                ]
+                .spacing(4)
+                .width(Length::Fill),
+            ]
+            .spacing(12),
+            error_row,
+            row![
+                button("Save").on_press(Message::SubmitManualEntry).style(button::primary),
+                button("Cancel")
+                    .on_press(Message::ShowView(ViewState::Main))
+                    .style(button::secondary),
+            ]
+            .spacing(8),
+        ]
+        .spacing(12)
+        .padding(16);
+
+        container(form).into()
     }
 }
