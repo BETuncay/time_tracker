@@ -11,4 +11,4 @@ PROMPT="Read AGENT.md in the current directory and follow the Agent Work Loop de
 5. Commit all changes with a clear commit message
 Stop after completing one task unless the task was trivial (e.g. only a config or file change), in which case continue to the next one."
 
-claude --dangerouslySkipPermissions -p "$PROMPT"
+claude "$PROMPT" -p --dangerously-skip-permissions

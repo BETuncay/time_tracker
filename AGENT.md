@@ -75,6 +75,23 @@ Two files are used to track work across sessions:
 
 New ideas that come up during work go into `IDEAS.md`, not `TODO.md`, to avoid scope creep.
 
+## Documentation
+
+Keep documentation minimal and close to the code:
+
+- Update `AGENT.md` only when architecture, stack, or principles change
+- Add doc comments (`///`) only on public functions where the intent isn't obvious from the name and signature
+- No separate docs folder, no README sections duplicating what the code already shows
+
+## Testing
+
+Write a small number of focused tests — enough to catch regressions, not to achieve coverage metrics:
+
+- Unit test pure logic: duration calculation, entry parsing, data model helpers
+- Skip tests for UI rendering or SQLite wiring — those are better caught by running the app
+- Tests live in the same file as the code they cover (`#[cfg(test)]` module at the bottom)
+- Each new feature should have at least one test for its core invariant
+
 ## Agent Work Loop
 
 Each session follows this exact sequence:
@@ -82,8 +99,9 @@ Each session follows this exact sequence:
 1. **Read** `TODO.md` — identify the next open `[ ]` item
 2. **Mark it** `[~]` in progress
 3. **Implement** the feature or task
-4. **Mark it** `[x]` done in `TODO.md`
-5. **Commit** all changes (source + updated `TODO.md`) with a clear message describing what was done
-6. **Repeat** from step 1 until told to stop or no open items remain
+4. **Write tests** for any pure logic introduced
+5. **Mark it** `[x]` done in `TODO.md`
+6. **Commit** all changes (source + updated `TODO.md`) with a clear message describing what was done
+7. **Repeat** from step 1 until told to stop or no open items remain
 
 If a new idea surfaces during implementation, append it to `IDEAS.md` before continuing — do not act on it immediately.
