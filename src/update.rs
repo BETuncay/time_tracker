@@ -17,6 +17,12 @@ pub enum Message {
     ManualFormStart(String),
     ManualFormEnd(String),
     SubmitManualEntry,
+    // edit entry form (reuses form_* fields)
+    EditFormTask(String),
+    EditFormDesc(String),
+    EditFormStart(String),
+    EditFormEnd(String),
+    SubmitEditEntry,
 }
 
 impl Model {
@@ -84,13 +90,25 @@ impl Model {
             }
 
             Message::ShowView(state) => {
-                if matches!(state, ViewState::ManualEntry) {
-                    // Reset form when opening
-                    self.form_task = self.tasks.first().cloned().unwrap_or_default();
-                    self.form_desc = String::new();
-                    self.form_start = String::new();
-                    self.form_end = String::new();
-                    self.form_error = None;
+                match &state {
+                    ViewState::ManualEntry => {
+                        self.form_task = self.tasks.first().cloned().unwrap_or_default();
+                        self.form_desc = String::new();
+                        self.form_start = String::new();
+                        self.form_end = String::new();
+                        self.form_error = None;
+                    }
+                    ViewState::EditEntry(id) => {
+                        if let Some(entry) = self.entries.iter().find(|e| e.id == *id) {
+                            use crate::model::format_time;
+                            self.form_task = entry.task.clone();
+                            self.form_desc = entry.description.clone();
+                            self.form_start = format_time(entry.started_at);
+                            self.form_end = entry.ended_at.map(format_time).unwrap_or_default();
+                            self.form_error = None;
+                        }
+                    }
+                    _ => {}
                 }
                 self.view_state = state;
                 Task::none()
@@ -117,6 +135,36 @@ impl Model {
                             });
                             self.entries.sort_by_key(|e| e.started_at);
                         }
+                        self.view_state = ViewState::Main;
+                        self.form_error = None;
+                    }
+                    (None, _) => self.form_error = Some("Invalid start time (use HH:MM)".into()),
+                    (_, None) => self.form_error = Some("Invalid end time (use HH:MM)".into()),
+                    _ => self.form_error = Some("End time must be after start time".into()),
+                }
+                Task::none()
+            }
+
+            Message::EditFormTask(t) => { self.form_task = t; Task::none() }
+            Message::EditFormDesc(d) => { self.form_desc = d; Task::none() }
+            Message::EditFormStart(s) => { self.form_start = s; Task::none() }
+            Message::EditFormEnd(e) => { self.form_end = e; Task::none() }
+
+            Message::SubmitEditEntry => {
+                let id = if let ViewState::EditEntry(id) = self.view_state { id } else { return Task::none(); };
+                let start = parse_hhmm_today(&self.form_start);
+                let end = parse_hhmm_today(&self.form_end);
+                match (start, end) {
+                    (Some(s), Some(e)) if e > s => {
+                        let conn = db::open().expect("db open");
+                        let _ = db::update_entry(&conn, id, &self.form_task, &self.form_desc, s, Some(e));
+                        if let Some(entry) = self.entries.iter_mut().find(|e| e.id == id) {
+                            entry.task = self.form_task.clone();
+                            entry.description = self.form_desc.clone();
+                            entry.started_at = s;
+                            entry.ended_at = Some(e);
+                        }
+                        self.entries.sort_by_key(|e| e.started_at);
                         self.view_state = ViewState::Main;
                         self.form_error = None;
                     }

@@ -64,6 +64,21 @@ pub fn update_description(conn: &Connection, id: i64, description: &str) -> Resu
     Ok(())
 }
 
+pub fn update_entry(
+    conn: &Connection,
+    id: i64,
+    task: &str,
+    description: &str,
+    started_at: i64,
+    ended_at: Option<i64>,
+) -> Result<()> {
+    conn.execute(
+        "UPDATE entries SET task = ?1, description = ?2, started_at = ?3, ended_at = ?4 WHERE id = ?5",
+        params![task, description, started_at, ended_at, id],
+    )?;
+    Ok(())
+}
+
 pub fn delete_entry(conn: &Connection, id: i64) -> Result<()> {
     conn.execute("DELETE FROM entries WHERE id = ?1", params![id])?;
     Ok(())
