@@ -13,7 +13,7 @@
 - [x] Entry log panel — list today's entries with task, description, start, end, duration
 - [x] Manual entry form — add a past time block
 - [x] Edit entry — modify description or times inline
-- [ ] Task management — add, rename, remove task buttons
+- [x] Task management — add, rename, remove task buttons
 - [ ] Basic reporting — daily and weekly totals per task
 
 ## Done

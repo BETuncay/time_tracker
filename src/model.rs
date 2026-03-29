@@ -76,6 +76,11 @@ pub struct Model {
     pub form_start: String,
     pub form_end: String,
     pub form_error: Option<String>,
+    // task management state
+    pub task_new_name: String,
+    pub task_new_error: Option<String>,
+    pub task_renaming: Option<usize>,  // index of task being renamed
+    pub task_rename_text: String,
 }
 
 impl Entry {
@@ -152,5 +157,28 @@ mod tests {
             ended_at: None,
         };
         assert_eq!(e.duration_secs(), 0);
+    }
+
+    // Task management invariants
+    #[test]
+    fn task_duplicate_detection_is_case_insensitive() {
+        let tasks = vec!["Development".to_string(), "Meetings".to_string()];
+        // Same case — duplicate
+        assert!(tasks.iter().any(|t| t.eq_ignore_ascii_case("Development")));
+        // Different case — still duplicate
+        assert!(tasks.iter().any(|t| t.eq_ignore_ascii_case("development")));
+        assert!(tasks.iter().any(|t| t.eq_ignore_ascii_case("MEETINGS")));
+        // Not a duplicate
+        assert!(!tasks.iter().any(|t| t.eq_ignore_ascii_case("Admin")));
+    }
+
+    #[test]
+    fn task_rename_excludes_self_from_duplicate_check() {
+        let tasks = vec!["Dev".to_string(), "Meetings".to_string()];
+        let idx = 0;
+        let new_name = "dev"; // same task, just lower-case — should be allowed
+        let duplicate = tasks.iter().enumerate()
+            .any(|(i, t)| i != idx && t.eq_ignore_ascii_case(new_name));
+        assert!(!duplicate, "renaming a task to a case variation of itself should not be blocked");
     }
 }

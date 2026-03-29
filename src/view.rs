@@ -1,4 +1,4 @@
-use iced::widget::{button, column, container, row, text, text_input};
+use iced::widget::{button, column, container, row, text, text_input, horizontal_space};
 use iced::{Element, Length};
 use crate::model::{format_duration, format_hm, format_time, Model, ViewState};
 use crate::update::Message;
@@ -9,7 +9,7 @@ impl Model {
             ViewState::Main => self.view_main(),
             ViewState::ManualEntry => self.view_manual_entry(),
             ViewState::EditEntry(_) => self.view_edit_entry(),
-            ViewState::TaskManagement => text("Task Management — TODO").into(),
+            ViewState::TaskManagement => self.view_task_management(),
             ViewState::Report => text("Report — TODO").into(),
         }
     }
@@ -110,12 +110,19 @@ impl Model {
             column(items).spacing(4).into()
         };
 
-        let add_btn = button("+ Add Entry")
-            .on_press(Message::ShowView(ViewState::ManualEntry))
-            .style(button::secondary);
+        let bottom_row = row![
+            button("+ Add Entry")
+                .on_press(Message::ShowView(ViewState::ManualEntry))
+                .style(button::secondary),
+            horizontal_space(),
+            button("Manage Tasks")
+                .on_press(Message::ShowView(ViewState::TaskManagement))
+                .style(button::secondary),
+        ]
+        .spacing(8);
 
         container(
-            column![status, task_buttons, log, add_btn]
+            column![status, task_buttons, log, bottom_row]
                 .spacing(24)
                 .padding(16),
         )
@@ -273,5 +280,78 @@ impl Model {
         .padding(16);
 
         container(form).into()
+    }
+
+    fn view_task_management(&self) -> Element<'_, Message> {
+        let mut items: Vec<Element<'_, Message>> = vec![
+            text("Manage Tasks").size(20).into(),
+        ];
+
+        for (idx, task) in self.tasks.iter().enumerate() {
+            let row_el: Element<'_, Message> = if self.task_renaming == Some(idx) {
+                row![
+                    text_input("Task name", &self.task_rename_text)
+                        .on_input(Message::TaskRenameText)
+                        .on_submit(Message::TaskConfirmRename(idx))
+                        .padding([6, 10])
+                        .width(Length::Fill),
+                    button("OK")
+                        .on_press(Message::TaskConfirmRename(idx))
+                        .style(button::primary),
+                    button("Cancel")
+                        .on_press(Message::TaskCancelRename)
+                        .style(button::secondary),
+                ]
+                .spacing(8)
+                .into()
+            } else {
+                row![
+                    text(task.as_str()).width(Length::Fill),
+                    button("Rename")
+                        .on_press(Message::TaskStartRename(idx))
+                        .style(button::secondary),
+                    button("Delete")
+                        .on_press(Message::TaskDelete(idx))
+                        .style(button::danger),
+                ]
+                .spacing(8)
+                .into()
+            };
+            items.push(row_el);
+        }
+
+        // Add-task row
+        let add_error: Element<'_, Message> = if let Some(err) = &self.task_new_error {
+            text(err.as_str()).size(13).color([0.9, 0.3, 0.3]).into()
+        } else {
+            text("").size(13).into()
+        };
+
+        items.push(
+            row![
+                text_input("New task name", &self.task_new_name)
+                    .on_input(Message::TaskNewName)
+                    .on_submit(Message::TaskAdd)
+                    .padding([6, 10])
+                    .width(Length::Fill),
+                button("Add Task")
+                    .on_press(Message::TaskAdd)
+                    .style(button::primary),
+            ]
+            .spacing(8)
+            .into(),
+        );
+        items.push(add_error);
+        items.push(
+            button("Back")
+                .on_press(Message::ShowView(ViewState::Main))
+                .style(button::secondary)
+                .into(),
+        );
+
+        container(
+            column(items).spacing(10).padding(16),
+        )
+        .into()
     }
 }

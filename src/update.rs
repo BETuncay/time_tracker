@@ -23,17 +23,20 @@ pub enum Message {
     EditFormStart(String),
     EditFormEnd(String),
     SubmitEditEntry,
+    // task management
+    TaskNewName(String),
+    TaskAdd,
+    TaskStartRename(usize),
+    TaskRenameText(String),
+    TaskConfirmRename(usize),
+    TaskCancelRename,
+    TaskDelete(usize),
 }
 
 impl Model {
     pub fn new() -> (Self, Task<Message>) {
         let conn = db::open().expect("failed to open database");
-        let tasks = vec![
-            "Development".to_string(),
-            "Meetings".to_string(),
-            "Review".to_string(),
-            "Admin".to_string(),
-        ];
+        let tasks = db::load_tasks(&conn).unwrap_or_default();
         let entries = db::load_today(&conn).unwrap_or_default();
         let form_task = tasks.first().cloned().unwrap_or_default();
         let model = Self {
@@ -46,6 +49,10 @@ impl Model {
             form_start: String::new(),
             form_end: String::new(),
             form_error: None,
+            task_new_name: String::new(),
+            task_new_error: None,
+            task_renaming: None,
+            task_rename_text: String::new(),
         };
         (model, Task::none())
     }
@@ -171,6 +178,96 @@ impl Model {
                     (None, _) => self.form_error = Some("Invalid start time (use HH:MM)".into()),
                     (_, None) => self.form_error = Some("Invalid end time (use HH:MM)".into()),
                     _ => self.form_error = Some("End time must be after start time".into()),
+                }
+                Task::none()
+            }
+
+            Message::TaskNewName(s) => {
+                self.task_new_name = s;
+                self.task_new_error = None;
+                Task::none()
+            }
+
+            Message::TaskAdd => {
+                let name = self.task_new_name.trim().to_string();
+                if name.is_empty() {
+                    self.task_new_error = Some("Task name cannot be empty".into());
+                } else if self.tasks.iter().any(|t| t.eq_ignore_ascii_case(&name)) {
+                    self.task_new_error = Some("A task with that name already exists".into());
+                } else {
+                    let conn = db::open().expect("db open");
+                    if let Err(_) = db::insert_task(&conn, &name) {
+                        self.task_new_error = Some("Failed to save task".into());
+                    } else {
+                        self.tasks.push(name);
+                        self.task_new_name = String::new();
+                        self.task_new_error = None;
+                    }
+                }
+                Task::none()
+            }
+
+            Message::TaskStartRename(idx) => {
+                if let Some(name) = self.tasks.get(idx) {
+                    self.task_rename_text = name.clone();
+                    self.task_renaming = Some(idx);
+                }
+                Task::none()
+            }
+
+            Message::TaskRenameText(s) => {
+                self.task_rename_text = s;
+                Task::none()
+            }
+
+            Message::TaskConfirmRename(idx) => {
+                let new_name = self.task_rename_text.trim().to_string();
+                let old_name = self.tasks.get(idx).cloned().unwrap_or_default();
+                if !new_name.is_empty()
+                    && !self.tasks.iter().enumerate()
+                        .any(|(i, t)| i != idx && t.eq_ignore_ascii_case(&new_name))
+                {
+                    let conn = db::open().expect("db open");
+                    let _ = db::rename_task(&conn, &old_name, &new_name);
+                    // Update in-memory entries that referenced old name
+                    for entry in self.entries.iter_mut() {
+                        if entry.task == old_name {
+                            entry.task = new_name.clone();
+                        }
+                    }
+                    // Update active timer task name if needed
+                    if let Some(ref mut timer) = self.active {
+                        if timer.task == old_name {
+                            timer.task = new_name.clone();
+                        }
+                    }
+                    if let Some(task) = self.tasks.get_mut(idx) {
+                        *task = new_name;
+                    }
+                }
+                self.task_renaming = None;
+                self.task_rename_text = String::new();
+                Task::none()
+            }
+
+            Message::TaskCancelRename => {
+                self.task_renaming = None;
+                self.task_rename_text = String::new();
+                Task::none()
+            }
+
+            Message::TaskDelete(idx) => {
+                if idx < self.tasks.len() {
+                    let name = self.tasks.remove(idx);
+                    let conn = db::open().expect("db open");
+                    let _ = db::delete_task(&conn, &name);
+                    // Cancel rename if it was pointing at this or a later index
+                    if let Some(ri) = self.task_renaming {
+                        if ri >= idx {
+                            self.task_renaming = None;
+                            self.task_rename_text = String::new();
+                        }
+                    }
                 }
                 Task::none()
             }

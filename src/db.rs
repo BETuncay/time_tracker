@@ -3,6 +3,8 @@ use crate::model::Entry;
 
 const DB_PATH: &str = "time-tracker.db";
 
+const DEFAULT_TASKS: &[&str] = &["Development", "Meetings", "Review", "Admin"];
+
 pub fn open() -> Result<Connection> {
     let conn = Connection::open(DB_PATH)?;
     conn.execute_batch(
@@ -12,9 +14,48 @@ pub fn open() -> Result<Connection> {
             description TEXT NOT NULL DEFAULT '',
             started_at  INTEGER NOT NULL,
             ended_at    INTEGER
+        );
+        CREATE TABLE IF NOT EXISTS tasks (
+            id   INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE
         );",
     )?;
+    // Seed defaults on first run
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM tasks", [], |r| r.get(0))?;
+    if count == 0 {
+        for name in DEFAULT_TASKS {
+            conn.execute("INSERT OR IGNORE INTO tasks (name) VALUES (?1)", params![name])?;
+        }
+    }
     Ok(conn)
+}
+
+pub fn load_tasks(conn: &Connection) -> Result<Vec<String>> {
+    let mut stmt = conn.prepare("SELECT name FROM tasks ORDER BY id")?;
+    let rows = stmt.query_map([], |r| r.get(0))?;
+    rows.collect()
+}
+
+pub fn insert_task(conn: &Connection, name: &str) -> Result<()> {
+    conn.execute("INSERT INTO tasks (name) VALUES (?1)", params![name])?;
+    Ok(())
+}
+
+pub fn rename_task(conn: &Connection, old_name: &str, new_name: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE tasks SET name = ?1 WHERE name = ?2",
+        params![new_name, old_name],
+    )?;
+    conn.execute(
+        "UPDATE entries SET task = ?1 WHERE task = ?2",
+        params![new_name, old_name],
+    )?;
+    Ok(())
+}
+
+pub fn delete_task(conn: &Connection, name: &str) -> Result<()> {
+    conn.execute("DELETE FROM tasks WHERE name = ?1", params![name])?;
+    Ok(())
 }
 
 pub fn load_today(conn: &Connection) -> Result<Vec<Entry>> {
